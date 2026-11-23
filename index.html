@@ -46,11 +46,14 @@
           <p class="form-feedback" id="form-feedback" role="status" hidden></p>
         </form>
         <div class="panel-foot">
-          <button type="button" class="text-button" id="demo" disabled>试用示例</button>
+          <div class="examples">
+            <button type="button" class="text-button" id="demo" disabled>试用示例</button>
+            <button type="button" class="text-button" id="demo-hls" disabled hidden>M3U8 示例</button>
+          </div>
           <span id="local-label">只在本机运行</span>
           <a id="local-launch" class="text-button" href="http://127.0.0.1:8765/" rel="noreferrer" hidden>打开本地版</a>
         </div>
-        <p class="hint" id="local-guide" hidden>网页播放地址和 M3U8 需要本机解析，请先<a href="https://github.com/phdsx/videodownloader#启动">安装本地版</a>。</p>
+        <p class="hint" id="local-guide" hidden>普通播放页和无法跨域读取的流可用<a href="https://github.com/phdsx/videodownloader#启动">本地版</a>处理。</p>
       </section>
 
       <section class="preview" aria-labelledby="video-heading">

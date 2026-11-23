@@ -66,6 +66,7 @@ label { display: inline-block; font-size: 14px; font-weight: 680; margin-bottom:
 .form-feedback { font-size: 14px; line-height: 1.55; margin-top: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .form-feedback[data-error="true"], .job[data-state="failed"] #job-text { color: var(--danger); }
 .panel-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #e7ebe4; padding-top: 13px; margin-top: 19px; color: var(--muted); font-size: 13px; }
+.examples { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .text-button { color: var(--green); border: 0; padding: 3px 0; background: none; font-size: 14px; font-weight: 680; text-decoration: none; }
 .text-button:hover { text-decoration: underline; }
 .text-button:disabled { color: var(--muted); text-decoration: none; }

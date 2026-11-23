@@ -4,7 +4,11 @@
 
 ## 网页版
 
-打开 [GitHub Pages](https://phdsx.github.io/videodownloader/) 可下载支持跨域读取的 HTTPS 视频和音频直链，也可以通过 **试用示例** 下载仓库内的 MP4。解析视频播放页或 M3U8 时，请按下面的说明启动本地版，再点击页面中的 **打开本地版**。
+打开 [GitHub Pages](https://phdsx.github.io/videodownloader/) 可下载支持跨域读取的 HTTPS 媒体直链和未加密的 M3U8 点播。点击 **M3U8 示例** 可以下载仓库内的点播样片。
+
+网页版会按照清单顺序保存分片。MPEG-TS 分片保存为 TS，fMP4 分片保存为 MP4 或 M4A，独立音轨可以单独下载。跨域读取需要源站同时开放清单和所有分片。解析普通视频播放页、处理网页版无法读取的流，或合并独立音视频轨道时，请使用本地版。
+
+网页版的 HLS 清单解析使用 [m3u8-parser](https://github.com/videojs/m3u8-parser)。
 
 ## 启动
 

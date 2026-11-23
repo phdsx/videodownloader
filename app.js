@@ -5,6 +5,7 @@ const form = byId("link-form");
 const input = byId("video-url");
 const inspectButton = byId("inspect");
 const demoButton = byId("demo");
+const hlsDemoButton = byId("demo-hls");
 const thumbnail = byId("thumbnail");
 const filters = byId("filters");
 const formats = byId("format-rows");
@@ -16,6 +17,7 @@ const details = byId("job-details");
 const webMode = ["http:", "https:"].includes(location.protocol) &&
   !["127.0.0.1", "localhost"].includes(location.hostname);
 const demoFile = new URL("./demo.mp4", location.href);
+const demoPlaylist = new URL("./demo.m3u8", location.href);
 const videoExtensions = new Set(["mp4", "webm", "mkv", "mov", "m4v", "avi", "flv", "3gp"]);
 const audioExtensions = new Set(["m4a", "mp3", "wav", "flac", "ogg", "opus", "aac"]);
 let online = false;
@@ -46,7 +48,7 @@ async function api(path, body) {
 }
 
 function updateControls() {
-  inspectButton.disabled = demoButton.disabled = !online || inspecting || downloading;
+  inspectButton.disabled = demoButton.disabled = hlsDemoButton.disabled = !online || inspecting || downloading;
   for (const button of formats.querySelectorAll("button")) {
     button.disabled = downloading;
   }
@@ -64,11 +66,12 @@ async function connect() {
     online = true;
     byId("service-status").dataset.state = "ready";
     byId("service-text").textContent = "网页版 · 直链下载";
-    byId("intro-text").textContent = "下载 HTTPS 视频和音频直链，或打开本地版解析视频网页。";
-    byId("link-hint").textContent = "支持 MP4、WebM、MP3 等媒体文件的 HTTPS 直链。";
+    byId("intro-text").textContent = "下载 HTTPS 媒体直链和 M3U8 点播，或打开本地版解析视频网页。";
+    byId("link-hint").textContent = "支持 MP4、WebM、MP3 和可跨域读取的 M3U8 清单。";
     byId("local-label").hidden = true;
     byId("local-launch").hidden = false;
     byId("local-guide").hidden = false;
+    hlsDemoButton.hidden = false;
     updateControls();
     return;
   }
@@ -205,25 +208,46 @@ function updateLocalLink() {
   byId("local-launch").href = "http://127.0.0.1:8765/" + fragment;
 }
 
-function inspectDirect(url) {
-  if (url.protocol !== "https:") throw new Error("网页版需要 HTTPS 媒体直链。可打开本地版使用这个链接。");
+function mediaFilename(url) {
   const filename = url.pathname.split("/").pop();
-  const extension = filename.match(/\.([a-z0-9]+)$/i)?.[1].toLowerCase();
-  const kind = videoExtensions.has(extension) ? "video" : audioExtensions.has(extension) ? "audio" : null;
-  if (!kind) throw new Error("请输入以 MP4、WebM、MP3 等扩展名结尾的媒体直链。网页或 M3U8 请用本地版。");
-  let decoded = filename;
   try {
-    decoded = decodeURIComponent(filename);
+    return decodeURIComponent(filename);
   } catch {
-    // Some sources use a literal percent sign in file names.
+    return filename;
   }
-  const isDemo = url.href === demoFile.href;
+}
+
+function safeFilename(filename) {
+  return filename.replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, "_");
+}
+
+async function inspectWeb(url) {
+  if (url.protocol !== "https:") throw new Error("网页版需要 HTTPS 媒体地址。可打开本地版使用这个链接。");
+  const name = mediaFilename(url);
+  const extension = name.match(/\.([a-z0-9]+)$/i)?.[1].toLowerCase();
+  const isDemo = url.href === demoFile.href || url.href === demoPlaylist.href;
+  const thumbnailUrl = isDemo ? new URL("./demo.jpg", location.href).href : null;
+  if (extension === "m3u8" || extension === "m3u") {
+    const { inspectHls } = await import("./hls-download.js");
+    const item = await inspectHls(url.href);
+    const title = name.replace(/\.m3u8?$/i, "") || "HLS 视频";
+    return {
+      ...item,
+      hls: true,
+      title: isDemo ? "取帧示例 · 绿色波纹" : title,
+      filename: title,
+      thumbnail: thumbnailUrl,
+      source: url.hostname,
+    };
+  }
+  const kind = videoExtensions.has(extension) ? "video" : audioExtensions.has(extension) ? "audio" : null;
+  if (!kind) throw new Error("请输入 MP4、WebM、MP3 或 M3U8 直链。普通视频网页请用本地版。");
   return {
-    title: isDemo ? "取帧示例 · 绿色波纹" : decoded,
+    title: isDemo ? "取帧示例 · 绿色波纹" : name,
     source: url.hostname,
-    thumbnail: isDemo ? new URL("./demo.jpg", location.href).href : null,
+    thumbnail: thumbnailUrl,
     directUrl: url.href,
-    filename: decoded.replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, "_"),
+    filename: name,
     formats: [{ id: "direct", kind, extension }],
   };
 }
@@ -259,11 +283,13 @@ async function inspect() {
   renderJob(null, "");
   revokeDownload();
   try {
-    result = webMode ? inspectDirect(parsed) : await api("/api/inspect", { url });
+    result = webMode ? await inspectWeb(parsed) : await api("/api/inspect", { url });
     renderPreview(result);
     renderFormats();
-    const count = "找到 " + result.formats.length + " 种下载格式。";
-    feedback(webMode || result.ffmpeg ? count : count + " 安装 FFmpeg 后可合并音视频。");
+    const messages = ["找到 " + result.formats.length + " 种下载格式。"];
+    if (result.skipped) messages.push("有 " + result.skipped + " 条轨道需要用本地版处理。");
+    if (!webMode && !result.ffmpeg) messages.push("安装 FFmpeg 后可合并音视频。");
+    feedback(messages.join(" "));
   } catch (error) {
     byId("preview-state").textContent = "解析失败";
     feedback(error.message, true);
@@ -274,6 +300,12 @@ async function inspect() {
     byId("inspect-text").textContent = "解析视频";
     updateControls();
   }
+}
+
+function saveBrowserFile(url, filename) {
+  renderJob("ready", "文件已准备好。", null, url);
+  saveLink.download = safeFilename(filename);
+  saveLink.click();
 }
 
 async function downloadDirect(item) {
@@ -291,9 +323,7 @@ async function downloadDirect(item) {
       if (!blob.size) throw new Error("源站文件为空。");
       saveUrl = downloadObjectUrl = URL.createObjectURL(blob);
     }
-    renderJob("ready", "文件已准备好。", null, saveUrl);
-    saveLink.download = item.filename;
-    saveLink.click();
+    saveBrowserFile(saveUrl, item.filename);
   } catch (error) {
     const message = error instanceof TypeError
       ? "浏览器无法读取源站文件。可打开原始链接，或用本地版下载。"
@@ -304,6 +334,19 @@ async function downloadDirect(item) {
   }
 }
 
+async function downloadStream(item, format) {
+  revokeDownload();
+  const { downloadHls } = await import("./hls-download.js");
+  renderJob("downloading", "正在下载 M3U8 分片…", 0);
+  const blob = await downloadHls(format, (received, total) => {
+    renderJob("downloading", "已下载 " + received + " / " + total + " 个分片", received * 100 / total);
+  });
+  downloadObjectUrl = URL.createObjectURL(blob);
+  const quality = format.kind === "audio" ? (format.language || "音频") : format.height ? format.height + "p" : "";
+  const name = [item.filename, quality].filter(Boolean).join(" ");
+  saveBrowserFile(downloadObjectUrl, name + "." + format.extension);
+}
+
 async function download(formatId) {
   if (downloading || !result) return;
   downloading = true;
@@ -311,7 +354,8 @@ async function download(formatId) {
   renderJob("queued", "正在创建下载任务…");
   try {
     if (webMode) {
-      await downloadDirect(result);
+      if (result.hls) await downloadStream(result, result.formats.find((option) => option.id === formatId));
+      else await downloadDirect(result);
       return;
     }
     let job = await api("/api/download", { inspectionId: result.id, formatId });
@@ -364,6 +408,11 @@ byId("paste").addEventListener("click", async () => {
 
 demoButton.addEventListener("click", () => {
   input.value = webMode ? demoFile.href : new URL("/demo", location.href).href;
+  inspect();
+});
+
+hlsDemoButton.addEventListener("click", () => {
+  input.value = demoPlaylist.href;
   inspect();
 });
 
