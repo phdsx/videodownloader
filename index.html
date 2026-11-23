@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="解析网页视频，选择可用格式并下载到本机。">
+  <title>取帧 · 网页视频解析与下载</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>取帧</span>
+      </div>
+      <span class="service-status" id="service-status" data-state="pending">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="service-text">正在连接</span>
+      </span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="intro">
+      <h1>网页视频解析与下载</h1>
+      <p id="intro-text">粘贴视频播放页或媒体直链，选择可用的清晰度和格式。</p>
+    </div>
+
+    <div class="workspace">
+      <section class="panel input-panel" aria-labelledby="link-heading">
+        <h2 id="link-heading">解析链接</h2>
+        <form id="link-form" novalidate>
+          <label for="video-url">视频链接</label>
+          <div class="input-row">
+            <span class="link-icon" aria-hidden="true"></span>
+            <input id="video-url" name="url" type="url" placeholder="https://" inputmode="url" autocomplete="off" spellcheck="false" maxlength="4000" required aria-describedby="link-hint">
+            <button type="button" class="paste-button" id="paste">粘贴</button>
+          </div>
+          <p class="hint" id="link-hint">可输入视频网页、视频直链或 M3U8 播放地址。</p>
+          <button type="submit" class="button primary" id="inspect" disabled>
+            <span class="button-mark" aria-hidden="true"></span>
+            <span id="inspect-text">解析视频</span>
+          </button>
+          <p class="form-feedback" id="form-feedback" role="status" hidden></p>
+        </form>
+        <div class="panel-foot">
+          <button type="button" class="text-button" id="demo" disabled>试用示例</button>
+          <span id="local-label">只在本机运行</span>
+          <a id="local-launch" class="text-button" href="http://127.0.0.1:8765/" rel="noreferrer" hidden>打开本地版</a>
+        </div>
+        <p class="hint" id="local-guide" hidden>网页播放地址和 M3U8 需要本机解析，请先<a href="https://github.com/phdsx/videodownloader#启动">安装本地版</a>。</p>
+      </section>
+
+      <section class="preview" aria-labelledby="video-heading">
+        <header class="preview-header">
+          <h2 id="video-heading">视频信息</h2>
+          <span id="preview-state">等待解析</span>
+        </header>
+        <div class="viewfinder" id="viewfinder">
+          <div class="view-grid" aria-hidden="true"></div>
+          <img id="thumbnail" alt="" referrerpolicy="no-referrer" hidden>
+          <div class="frame-icon" id="frame-icon" aria-hidden="true">
+            <span class="corner tl"></span><span class="corner tr"></span>
+            <span class="corner bl"></span><span class="corner br"></span>
+            <span class="play-mark"></span>
+          </div>
+        </div>
+        <div class="preview-caption">
+          <strong id="video-title">解析结果将在这里显示</strong>
+          <p id="video-meta">视频标题、来源和时长</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel formats-panel" aria-labelledby="format-heading">
+      <div class="formats-header">
+        <h2 id="format-heading">下载格式</h2>
+        <div class="filters" id="filters" role="group" aria-label="筛选下载格式" hidden>
+          <button type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-filter="video" aria-pressed="false">视频</button>
+          <button type="button" data-filter="audio" aria-pressed="false">音频</button>
+        </div>
+      </div>
+      <div class="format-empty" id="format-empty">
+        <span class="download-icon" aria-hidden="true"></span>
+        <p>解析链接后，可在这里选择格式并下载。</p>
+      </div>
+      <div class="table-wrap" id="format-table" hidden>
+        <table>
+          <thead><tr><th scope="col">清晰度 / 音质</th><th scope="col">格式</th><th scope="col">大小</th><th scope="col"><span class="visually-hidden">操作</span></th></tr></thead>
+          <tbody id="format-rows"></tbody>
+        </table>
+      </div>
+      <div class="job" id="job" hidden>
+        <div class="job-line">
+          <p role="status" id="job-text"></p>
+          <a id="source-file" class="text-button" target="_blank" rel="noreferrer" hidden>打开原始链接</a>
+          <a id="save-file" class="button primary" hidden>保存到电脑</a>
+        </div>
+        <progress id="progress" max="100" aria-label="当前媒体下载进度" hidden></progress>
+        <details id="job-details" hidden><summary>查看错误详情</summary><p></p></details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p>仅下载你拥有下载权的视频。</p>
+    <p>由 <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noreferrer">yt-dlp</a> 和 <a href="https://ffmpeg.org/" target="_blank" rel="noreferrer">FFmpeg</a> 提供支持<span id="ffmpeg-note" hidden> · 未检测到 FFmpeg</span></p>
+  </footer>
+</body>
+</html>
