@@ -18,6 +18,7 @@ const webMode = ["http:", "https:"].includes(location.protocol) &&
   !["127.0.0.1", "localhost"].includes(location.hostname);
 const demoFile = new URL("./demo.mp4", location.href);
 const demoPlaylist = new URL("./demo.m3u8", location.href);
+const hlsModule = "./hls-download.js?v=mp4";
 const videoExtensions = new Set(["mp4", "webm", "mkv", "mov", "m4v", "avi", "flv", "3gp"]);
 const audioExtensions = new Set(["m4a", "mp3", "wav", "flac", "ogg", "opus", "aac"]);
 let online = false;
@@ -66,7 +67,7 @@ async function connect() {
     online = true;
     byId("service-status").dataset.state = "ready";
     byId("service-text").textContent = "网页版 · 直链下载";
-    byId("intro-text").textContent = "下载 HTTPS 媒体直链和 M3U8 点播，或打开本地版解析视频网页。";
+    byId("intro-text").textContent = "下载 HTTPS 媒体直链，或将可读取的 M3U8 点播保存为 MP4。";
     byId("link-hint").textContent = "支持 MP4、WebM、MP3 和可跨域读取的 M3U8 清单。";
     byId("local-label").hidden = true;
     byId("local-launch").hidden = false;
@@ -141,7 +142,8 @@ function mediaLabels(option) {
   }
   const quality = option.height ? option.height + "p" : "源画质";
   const track = option.merge ? "合并音视频" : option.kind === "video-only" ? "仅视频" : "视频";
-  return [quality, [track, option.fps ? option.fps + " fps" : null, option.language].filter(Boolean).join(" · ")];
+  const remux = option.sourceFormat && !option.merge ? "封装为 MP4" : null;
+  return [quality, [track, remux, option.fps ? option.fps + " fps" : null, option.language].filter(Boolean).join(" · ")];
 }
 
 function renderFormats() {
@@ -228,7 +230,7 @@ async function inspectWeb(url) {
   const isDemo = url.href === demoFile.href || url.href === demoPlaylist.href;
   const thumbnailUrl = isDemo ? new URL("./demo.jpg", location.href).href : null;
   if (extension === "m3u8" || extension === "m3u") {
-    const { inspectHls } = await import("./hls-download.js");
+    const { inspectHls } = await import(hlsModule);
     const item = await inspectHls(url.href);
     const title = name.replace(/\.m3u8?$/i, "") || "HLS 视频";
     return {
@@ -334,16 +336,50 @@ async function downloadDirect(item) {
   }
 }
 
+async function packageMp4(video, audio) {
+  const worker = new Worker(new URL("./mp4-worker.js", location.href), { type: "module" });
+  try {
+    return await new Promise((resolve, reject) => {
+      worker.onmessage = ({ data }) => {
+        if (data.blob?.size) resolve(data.blob);
+        else reject(new Error(data.error || "没有生成 MP4 文件。"));
+      };
+      worker.onerror = () => reject(new Error("无法启动浏览器的 MP4 封装。"));
+      worker.onmessageerror = () => reject(new Error("无法读取浏览器生成的 MP4。"));
+      worker.postMessage({ video, audio });
+    });
+  } finally {
+    worker.terminate();
+  }
+}
+
 async function downloadStream(item, format) {
   revokeDownload();
-  const { downloadHls } = await import("./hls-download.js");
-  renderJob("downloading", "正在下载 M3U8 分片…", 0);
-  const blob = await downloadHls(format, (received, total) => {
+  const { downloadHls } = await import(hlsModule);
+  const source = format.sourceFormat || format;
+  const audio = format.audioTrack;
+  const videoParts = source.parts.length;
+  const total = videoParts + (audio?.parts.length || 0);
+  const report = (received) => {
     renderJob("downloading", "已下载 " + received + " / " + total + " 个分片", received * 100 / total);
-  });
+  };
+  renderJob("downloading", "正在下载 M3U8 分片…", 0);
+  let blob = await downloadHls(source, report);
+  const audioBlob = audio ? await downloadHls(audio, (received) => report(videoParts + received)) : null;
+  if (format.sourceFormat) {
+    renderJob("processing", "正在封装 MP4…");
+    try {
+      blob = await packageMp4(blob, audioBlob);
+    } catch (cause) {
+      const error = new Error("这个视频在浏览器中封装失败。可下载原始格式，或用本地版处理。");
+      error.detail = cause.message;
+      throw error;
+    }
+  }
   downloadObjectUrl = URL.createObjectURL(blob);
-  const quality = format.kind === "audio" ? (format.language || "音频") : format.height ? format.height + "p" : "";
-  const name = [item.filename, quality].filter(Boolean).join(" ");
+  const quality = format.height ? format.height + "p" : null;
+  const track = format.kind === "audio" ? (format.language || "音频") : format.kind === "video-only" ? "仅视频" : null;
+  const name = [item.filename, quality, track].filter(Boolean).join(" ");
   saveBrowserFile(downloadObjectUrl, name + "." + format.extension);
 }
 

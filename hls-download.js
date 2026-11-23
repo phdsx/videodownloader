@@ -102,9 +102,11 @@ function getRenditions({ manifest }) {
     const codecs = attributes.CODECS?.split(",").map((codec) => codec.trim()) || [];
     const audioOnly = codecs.length && codecs.every((codec) => /^(?:mp4a|ac-3|ec-3|opus|flac)(?:\.|$)/i.test(codec));
     const separateAudio = group.length && group.every((track) => track.uri);
+    const defaultAudio = separateAudio && (group.find((track) => track.default) || group[0]);
     choices.push({
       uri: playlist.uri,
       kind: audioOnly ? "audio" : separateAudio ? "video-only" : "video",
+      audioUri: defaultAudio?.uri,
       height: attributes.RESOLUTION?.height,
       fps: attributes["FRAME-RATE"],
       bitrate: (attributes["AVERAGE-BANDWIDTH"] || attributes.BANDWIDTH) / 1000,
@@ -118,6 +120,26 @@ function getRenditions({ manifest }) {
   return choices;
 }
 
+function addMp4Choices(tracks) {
+  return tracks.flatMap((track) => {
+    if (track.kind === "audio") return [track];
+    const audio = track.audioUri && tracks.find((item) => item.kind === "audio" && item.uri === track.audioUri);
+    const merge = audio && ((track.extension === "ts" && audio.extension === "ts") ||
+      (track.extension === "mp4" && audio.extension === "m4a"));
+    if (track.extension !== "ts" && !merge) return [track];
+
+    return [{
+      ...track,
+      kind: merge ? "video" : track.kind,
+      extension: "mp4",
+      bytes: null,
+      sourceFormat: track,
+      audioTrack: merge ? audio : null,
+      merge: Boolean(merge),
+    }, track];
+  }).map((format, index) => ({ ...format, id: String(index + 1) }));
+}
+
 export async function inspectHls(uri) {
   const playlist = await readPlaylist(mediaUrl(uri));
   const renditions = getRenditions(playlist);
@@ -125,7 +147,7 @@ export async function inspectHls(uri) {
   let firstError;
   let skipped = 0;
   if (!renditions.length) {
-    formats.push({ id: "1", ...planDownload(playlist, "video") });
+    formats.push(planDownload(playlist, "video"));
   } else {
     for (let index = 0; index < renditions.length; index += 4) {
       const batch = await Promise.allSettled(renditions.slice(index, index + 4).map(async (rendition) => {
@@ -144,9 +166,8 @@ export async function inspectHls(uri) {
     if (!formats.length) throw firstError;
     formats.sort((a, b) => (a.kind === "audio") - (b.kind === "audio") ||
       (b.height || 0) - (a.height || 0) || (b.bitrate || 0) - (a.bitrate || 0));
-    formats.forEach((format, index) => { format.id = String(index + 1); });
   }
-  return { formats, duration: formats[0].duration, skipped };
+  return { formats: addMp4Choices(formats), duration: formats[0].duration, skipped };
 }
 
 async function downloadPart(part, wholeFiles) {

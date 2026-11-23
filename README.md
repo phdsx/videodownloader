@@ -6,9 +6,11 @@
 
 打开 [GitHub Pages](https://phdsx.github.io/videodownloader/) 可下载支持跨域读取的 HTTPS 媒体直链和未加密的 M3U8 点播。点击 **M3U8 示例** 可以下载仓库内的点播样片。
 
-网页版会按照清单顺序保存分片。MPEG-TS 分片保存为 TS，fMP4 分片保存为 MP4 或 M4A，独立音轨可以单独下载。跨域读取需要源站同时开放清单和所有分片。解析普通视频播放页、处理网页版无法读取的流，或合并独立音视频轨道时，请使用本地版。
+在 **下载格式** 中选择 **MP4** 可将兼容的 MPEG-TS 分片在浏览器内重新封装，保留原有编码。网页版也可以保存原始 TS，或直接保存已是 fMP4 的视频分片。有匹配的默认音轨时，选择标有 **合并音视频** 的 MP4 可同时保存视频与音频。独立音轨也可以单独下载。
 
-网页版的 HLS 清单解析使用 [m3u8-parser](https://github.com/videojs/m3u8-parser)。
+跨域读取需要源站同时开放清单和所有分片。解析普通播放页、处理网页版无法读取的流或编码时，请使用本地版。
+
+网页版的 HLS 清单解析使用 m3u8-parser，MP4 封装使用按 MPL 2.0 发布的 Mediabunny 1.66.2。 [m3u8-parser](https://github.com/videojs/m3u8-parser) · [Mediabunny 1.66.2 源代码](https://registry.npmjs.org/mediabunny/-/mediabunny-1.66.2.tgz)
 
 ## 启动
 
